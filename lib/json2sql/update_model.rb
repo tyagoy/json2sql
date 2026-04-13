@@ -58,8 +58,9 @@ module Json2sql
         @sql << " = "
 
         case value
-        when Integer, Float then @sql << value.to_s
-        when String         then @sql << Sanitizer.value_wrap(value)
+        when Float   then @sql << value.to_s
+        when Integer then @sql << value.to_s
+        when String  then @sql << Sanitizer.value_wrap(value)
         end
       end
     end
