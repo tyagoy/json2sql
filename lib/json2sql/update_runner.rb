@@ -1,4 +1,5 @@
 module Json2sql
+
   # Builds one or more UPDATE statements from a Hash of table → params.
   #
   # Usage (single row):
@@ -16,13 +17,19 @@ module Json2sql
   #       { "columns" => { "value" => "en" },    "and" => { "key" => "lang" } }
   #     ]
   #   )
+
   class UpdateRunner
+
     def self.build(input)
-      input    = Json2sql.normalize(input)
-      sql      = +""
+
+      sql = +""
+
+      input = Json2sql.normalize(input)
+
       relation = WhereRelation.none("")
 
       input.each do |table, value|
+
         tbl = table.to_s
 
         case value

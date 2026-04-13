@@ -14,11 +14,15 @@ module Json2sql
   #     ]
   #   )
   class InsertRunner
+
     def self.build(input)
+
+      sql = +""
+
       input = Json2sql.normalize(input)
-      sql   = +""
 
       input.each do |table, value|
+        
         tbl = table.to_s
 
         case value
