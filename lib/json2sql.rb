@@ -22,10 +22,14 @@ require_relative "json2sql/delete_runner"
 #   Json2sql::InsertRunner.build(hash) → String
 #   Json2sql::UpdateRunner.build(hash) → String
 #   Json2sql::DeleteRunner.build(hash) → String
+
 module Json2sql
+
   # Deep-converts all Hash keys to Strings and recurses into nested Hashes
   # and Arrays. Leaves all other values (Integers, Strings, etc.) unchanged.
+
   def self.normalize(obj)
+    
     case obj
     when Hash
       obj.each_with_object({}) { |(k, v), h| h[k.to_s] = normalize(v) }
@@ -35,4 +39,5 @@ module Json2sql
       obj
     end
   end
+
 end

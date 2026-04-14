@@ -100,5 +100,7 @@ module Json2sql
 
       "`#{name}_id`"
     end
+
   end
+  
 end

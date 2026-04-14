@@ -53,5 +53,7 @@ module Json2sql
 
       sql
     end
+
   end
+  
 end
