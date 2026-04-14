@@ -291,40 +291,57 @@ module Json2sql
     # -------------------------------------------------------------------------
 
     def build_array(array)
+
       if array.empty?
+
         @sql << "NULL"
+
         return
       end
 
       glue = false
+
       array.each do |item|
+
         @sql << ", " if glue
+
         glue = true
 
         case item
-        when Integer, Float then @sql << item.to_s
-        when String         then @sql << Sanitizer.value_wrap(item)
+        when Float   then @sql << item.to_s
+        when Integer then @sql << item.to_s
+        when String  then @sql << Sanitizer.value_wrap(item)
         end
       end
     end
 
     # Builds a UNION of sub-SELECTs (used when action value is a Hash of tables).
+
     def build_object(object)
+
       if object.empty?
+
         @sql << "NULL"
+
         return
       end
 
       glue = false
+
       relation = WhereRelation.none(@table)
 
       object.each do |key, value|
+
         @sql << " UNION " if glue
+
         glue = true
 
         tbl = key.to_s
+
         @sql << "("
+
         SelectModel.new(@sql, tbl, relation).build_query_default(value)
+
         @sql << ")"
       end
     end
@@ -334,6 +351,7 @@ module Json2sql
     # -------------------------------------------------------------------------
 
     def get_action(action)
+      
       case action
       when "=", "<", ">", "<=", ">=", "!=", "<>" then action
       when "in"    then "IN"

@@ -26,6 +26,7 @@ module Json2sql
     end
 
     # SELECT COUNT(*) AS `table` FROM `table` WHERE ...
+
     def build_query_count(params)
 
       @sql << "SELECT COUNT(*) AS "
@@ -40,6 +41,7 @@ module Json2sql
     end
 
     # Plain SELECT col1, col2 FROM `table` WHERE ... ORDER BY ... LIMIT ... OFFSET ...
+
     def build_query_default(params)
 
       @sep = false
@@ -61,6 +63,7 @@ module Json2sql
 
     # SELECT JSON_ARRAYAGG(JSON_OBJECT(...)) AS `table`
     # FROM LATERAL (SELECT * FROM `table` WHERE ... ORDER ... LIMIT ...) AS `table`
+
     def build_query_array(params)
 
       @sep = false
@@ -92,6 +95,7 @@ module Json2sql
 
     # SELECT JSON_OBJECT(...) AS `table`
     # FROM LATERAL (SELECT * FROM `table` WHERE ...) AS `table`
+
     def build_query_object(params)
 
       @sep = false
@@ -124,6 +128,7 @@ module Json2sql
     # Smart dispatcher:
     #   - no options → build_query_array
     #   - options includes "total" → wraps with JSON_OBJECT('data', ..., 'total', COUNT(*))
+
     def build_query_options(params)
 
       options = params["options"]
@@ -161,6 +166,7 @@ module Json2sql
     # comma placement across multiple calls within a single query build.
 
     # Appends plain column references: `table`.`col`, `table`.`col2`, ...
+
     def build_columns_default(params)
 
       columns = params["columns"]
@@ -182,6 +188,7 @@ module Json2sql
     end
 
     # Appends JSON key-value pairs for columns: 'col', `table`.`col`, ...
+
     def build_columns_json(params)
 
       columns = params["columns"]
@@ -210,6 +217,7 @@ module Json2sql
 
     # Appends nested child arrays (subquery → JSON_ARRAYAGG).
     # Uses WhereRelation::PARENT because child table references parent.
+    
     def build_columns_array(params)
 
       children = params["children"]
@@ -240,6 +248,7 @@ module Json2sql
 
     # Appends nested parent objects (subquery → JSON_OBJECT, single row).
     # Uses WhereRelation::CHILD because parent table is referenced from child.
+
     def build_columns_object(params)
 
       parents = params["parents"]

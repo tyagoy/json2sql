@@ -33,14 +33,21 @@ module Json2sql
         tbl = table.to_s
 
         case value
+        
         when Hash
+
           UpdateModel.new(sql, tbl, relation).build(value)
+
           sql << ";\n"
+
         when Array
+
           value.each do |item|
+
             next unless item.is_a?(Hash)
 
             UpdateModel.new(sql, tbl, relation).build(item)
+
             sql << ";\n"
           end
         end

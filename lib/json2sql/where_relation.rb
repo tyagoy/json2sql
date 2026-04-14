@@ -46,21 +46,34 @@ module Json2sql
       current = current.to_s
 
       if kind == CHILD
+
         sql << Sanitizer.keyword_wrap(table)
+
         sql << "."
+
         sql << build_table_id(current)
+
         sql << " = "
+
         sql << Sanitizer.keyword_wrap(current)
+
         sql << ".`id`"
+
         return
       end
 
       if kind == PARENT
+
         sql << Sanitizer.keyword_wrap(current)
+
         sql << "."
+
         sql << build_table_id(table)
+
         sql << " = "
+
         sql << Sanitizer.keyword_wrap(table)
+        
         sql << ".`id`"
       end
     end
