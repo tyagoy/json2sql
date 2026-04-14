@@ -2,8 +2,8 @@ module Json2sql
 
   class WhereRelation
 
-    NONE   = :none
-    CHILD  = :child
+    NONE = :none
+    CHILD = :child
     PARENT = :parent
 
     attr_reader :table, :kind
@@ -73,7 +73,7 @@ module Json2sql
         sql << " = "
 
         sql << Sanitizer.keyword_wrap(table)
-        
+
         sql << ".`id`"
       end
     end
@@ -85,7 +85,9 @@ module Json2sql
     #   "admins"     → "`admin_id`"
     
     def build_table_id(tbl)
+
       tbl  = tbl.to_s
+      
       base = Sanitizer.keyword(tbl)
 
       name = if base.end_with?("ies")

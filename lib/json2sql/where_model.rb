@@ -88,6 +88,7 @@ module Json2sql
     end
 
     # Dispatch by Ruby type of the value.
+    
     def build_column_types(params, scope, column)
 
       case params
@@ -351,7 +352,7 @@ module Json2sql
     # -------------------------------------------------------------------------
 
     def get_action(action)
-      
+
       case action
       when "=", "<", ">", "<=", ">=", "!=", "<>" then action
       when "in"    then "IN"
