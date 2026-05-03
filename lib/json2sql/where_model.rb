@@ -370,7 +370,6 @@ module Json2sql
     def get_action(action)
 
       case action
-      when "=", "<", ">", "<=", ">=", "!=", "<>" then action
       when "in"    then "IN"
       when "!in"   then "NOT IN"
       when "like"  then "LIKE"
