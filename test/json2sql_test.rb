@@ -404,6 +404,26 @@ class InsertRunnerTest < Minitest::Test
     assert_match(/INSERT INTO `users`/, sql)
     assert_match(/`name`, `age`/, sql)
     assert_match(/'John', 30/, sql)
+    assert_match(/`created_at`/, sql)
+    assert_match(/`updated_at`/, sql)
+    assert_match(/NOW\(\)/, sql)
+  end
+
+  def test_insert_timestamps_auto_injected
+    sql = Json2sql::InsertRunner.build(
+      "posts" => { "columns" => { "title" => "Hello" } }
+    )
+    assert_match(/`title`, `created_at`, `updated_at`/, sql)
+    assert_match(/'Hello', NOW\(\), NOW\(\)/, sql)
+  end
+
+  def test_insert_timestamps_not_overridden_when_present
+    sql = Json2sql::InsertRunner.build(
+      "posts" => { "columns" => { "title" => "Hi", "created_at" => "2024-01-01", "updated_at" => "2024-01-02" } }
+    )
+    assert_match(/'2024-01-01'/, sql)
+    assert_match(/'2024-01-02'/, sql)
+    refute_match(/NOW\(\)/, sql)
   end
 
   def test_insert_float
@@ -456,7 +476,23 @@ class UpdateRunnerTest < Minitest::Test
     )
     assert_match(/UPDATE `users` SET/, sql)
     assert_match(/`users`\.`name` = 'Jane'/, sql)
+    assert_match(/`users`\.`updated_at` = NOW\(\)/, sql)
     assert_match(/WHERE \(`users`\.`id` = 42\)/, sql)
+  end
+
+  def test_update_timestamp_auto_injected
+    sql = Json2sql::UpdateRunner.build(
+      "posts" => { "columns" => { "title" => "New" }, "and" => { "id" => 1 } }
+    )
+    assert_match(/`posts`\.`updated_at` = NOW\(\)/, sql)
+  end
+
+  def test_update_timestamp_not_overridden_when_present
+    sql = Json2sql::UpdateRunner.build(
+      "posts" => { "columns" => { "title" => "Hi", "updated_at" => "2024-06-01" }, "and" => { "id" => 1 } }
+    )
+    assert_match(/'2024-06-01'/, sql)
+    refute_match(/NOW\(\)/, sql)
   end
 
   def test_update_integer_column

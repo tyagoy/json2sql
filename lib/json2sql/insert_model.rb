@@ -8,6 +8,8 @@ module Json2sql
   # Values:
   #   Integer / Float → inserted as raw numbers
   #   String          → wrapped in single quotes with SQL escaping
+  #
+  # Auto-injected when absent: created_at and updated_at → NOW()
 
   class InsertModel
 
@@ -20,28 +22,41 @@ module Json2sql
 
     def build(params)
 
+      columns = params["columns"]
+
+      return unless columns.is_a?(Hash)
+
+      columns = build_timestamps(columns)
+
       @sql << "INSERT INTO "
 
       @sql << Sanitizer.keyword_wrap(@table)
 
       @sql << " ("
 
-      build_columns(params)
+      build_columns(columns)
 
       @sql << ") VALUES ("
 
-      build_values(params)
+      build_values(columns)
 
       @sql << ")"
     end
 
     private
 
-    def build_columns(params)
+    def build_timestamps(columns)
 
-      columns = params["columns"]
+      timestamps = {}
 
-      return unless columns.is_a?(Hash)
+      timestamps["created_at"] = :now unless columns.key?("created_at")
+
+      timestamps["updated_at"] = :now unless columns.key?("updated_at")
+
+      timestamps.empty? ? columns : columns.merge(timestamps)
+    end
+
+    def build_columns(columns)
 
       separator = false
 
@@ -55,11 +70,7 @@ module Json2sql
       end
     end
 
-    def build_values(params)
-
-      columns  = params["columns"]
-
-      return unless columns.is_a?(Hash)
+    def build_values(columns)
 
       separator = false
 
@@ -73,6 +84,7 @@ module Json2sql
         when Float   then @sql << value.to_s
         when Integer then @sql << value.to_s
         when String  then @sql << Sanitizer.value_wrap(value)
+        when :now    then @sql << "NOW()"
         end
       end
     end

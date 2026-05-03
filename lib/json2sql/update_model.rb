@@ -8,6 +8,8 @@ module Json2sql
   #   "or"      => { ... }                  – WHERE conditions (OR)
   #
   # Value types follow the same rules as InsertModel.
+  #
+  # Auto-injected when absent: updated_at → NOW()
 
   class UpdateModel
 
@@ -22,31 +24,40 @@ module Json2sql
 
     def build(params)
 
+      columns = params["columns"]
+
+      return unless columns.is_a?(Hash)
+
+      columns = build_timestamp(columns)
+
       @sql << "UPDATE "
 
       @sql << Sanitizer.keyword_wrap(@table)
 
       @sql << " SET "
-      
-      build_columns(params)
+
+      build_columns(columns)
 
       WhereModel.new(@sql, @table, @relation).build(params)
     end
 
     private
 
-    def build_columns(params)
+    def build_timestamp(columns)
 
-      columns   = params["columns"]
+      return columns if columns.key?("updated_at")
 
-      return unless columns.is_a?(Hash)
+      columns.merge("updated_at" => :now)
+    end
+
+    def build_columns(columns)
 
       separator = false
 
       columns.each do |key, value|
 
         @sql << ", " if separator
-        
+
         separator = true
 
         column = key.to_s
@@ -61,6 +72,7 @@ module Json2sql
         when Float   then @sql << value.to_s
         when Integer then @sql << value.to_s
         when String  then @sql << Sanitizer.value_wrap(value)
+        when :now    then @sql << "NOW()"
         end
       end
     end
