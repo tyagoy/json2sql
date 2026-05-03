@@ -41,26 +41,24 @@ module Json2sql
 
       return unless has_relation || has_where_and || has_where_or
 
-      @sql << " WHERE "
+      parts = []
 
-      if has_relation
+      parts << with_buffer { @relation.build_table_relation(@sql, @table) } if has_relation
 
-        @relation.build_table_relation(@sql, @table)
+      scope = has_where_and ? " AND " : " OR "
+      
+      group = params["and"] || params["or"]
 
-        @sql << " AND " if has_where_and || has_where_or
+      if group
+
+        frag = build_column_group(group, scope)
+
+        parts << frag unless frag.empty?
       end
 
-      if has_where_and
+      return if parts.empty?
 
-        build_column_group(params["and"], " AND ")
-
-        return
-      end
-
-      if has_where_or
-
-        build_column_group(params["or"], " OR ")
-      end
+      @sql << " WHERE " << parts.join(" AND ")
     end
 
     private
@@ -71,20 +69,16 @@ module Json2sql
 
     def build_column_group(params, scope)
 
-      @sql << "("
+      fragments = params.filter_map do |key, value|
 
-      glue = false
+        frag = with_buffer { build_column_types(value, scope, key.to_s) }
 
-      params.each do |key, value|
-
-        @sql << scope if glue
-        
-        glue = true
-
-        build_column_types(value, scope, key.to_s)
+        frag.empty? ? nil : frag
       end
 
-      @sql << ")"
+      return "" if fragments.empty?
+
+      "(" + fragments.join(scope) + ")"
     end
 
     # Dispatch by Ruby type of the value.
@@ -92,6 +86,7 @@ module Json2sql
     def build_column_types(params, scope, column)
 
       case params
+
       when TrueClass, FalseClass
 
         build_action_types(params, column, "=")
@@ -108,15 +103,23 @@ module Json2sql
 
         if column == "and"
 
-          build_column_group(params, " AND ")
+          frag = build_column_group(params, " AND ")
 
-        elsif column == "or"
+          @sql << frag unless frag.empty?
 
-          build_column_group(params, " OR ")
-
-        else          
-          build_action_group(params, scope, column)
+          return
         end
+
+        if column == "or"
+
+          frag = build_column_group(params, " OR ")
+
+          @sql << frag unless frag.empty?
+
+          return
+        end
+
+        build_action_group(params, scope, column)
       end
     end
 
@@ -126,16 +129,14 @@ module Json2sql
 
     def build_action_group(params, scope, column)
 
-      glue = false
+      fragments = params.filter_map do |key, value|
 
-      params.each do |key, value|
+        frag = with_buffer { build_action_types(value, column, key.to_s) }
 
-        @sql << scope if glue
-
-        glue = true
-
-        build_action_types(value, column, key.to_s)
+        frag.empty? ? nil : frag
       end
+
+      @sql << fragments.join(scope) unless fragments.empty?
     end
 
     def build_action_types(params, column, action)
@@ -164,20 +165,20 @@ module Json2sql
     def build_action_values(params, column, action) # rubocop:disable Metrics/MethodLength
 
       case params
+      
       when TrueClass, FalseClass
 
         # Only "null" → IS NULL / IS NOT NULL. Boolean equality is not emitted
         # (matches C++ behaviour — use integer 1/0 for boolean equality).
-        if action == "null"
+        return unless action == "null"
 
-          action_str = params ? " IS " : " IS NOT "
+        action_str = params ? " IS " : " IS NOT "
 
-          @sql << Sanitizer.keyword_wrap(@table) << "."
+        @sql << Sanitizer.keyword_wrap(@table) << "."
 
-          @sql << Sanitizer.keyword_wrap(column)
+        @sql << Sanitizer.keyword_wrap(column)
 
-          @sql << action_str << "NULL"
-        end
+        @sql << action_str << "NULL"
 
       when Integer
 
@@ -238,6 +239,7 @@ module Json2sql
       action_name = get_action(action)
 
       case action_name
+
       when "last"
 
         @sql << Sanitizer.keyword_wrap(@table) << "."
@@ -264,26 +266,20 @@ module Json2sql
 
       else
 
+        @sql << Sanitizer.keyword_wrap(@table) << "."
+
+        @sql << Sanitizer.keyword_wrap(column)
+
+        @sql << " #{action_name} "
+
         if params.start_with?("$.")
-
-          @sql << Sanitizer.keyword_wrap(@table) << "."
-
-          @sql << Sanitizer.keyword_wrap(column)
-
-          @sql << " #{action_name} "
 
           @sql << Sanitizer.reference(params)
 
-        else
-
-          @sql << Sanitizer.keyword_wrap(@table) << "."
-
-          @sql << Sanitizer.keyword_wrap(column)
-
-          @sql << " #{action_name} "
-
-          @sql << Sanitizer.value_wrap(params)
+          return
         end
+
+        @sql << Sanitizer.value_wrap(params)
       end
     end
 
@@ -345,6 +341,26 @@ module Json2sql
 
         @sql << ")"
       end
+    end
+
+    # -------------------------------------------------------------------------
+    # Buffer helper — temporarily swap @sql for a fresh string so that any
+    # downstream << calls are captured in isolation. Returns the captured fragment.
+    # -------------------------------------------------------------------------
+
+    def with_buffer
+
+      saved = @sql
+
+      @sql = +""
+
+      yield
+
+      @sql
+
+    ensure
+
+      @sql = saved
     end
 
     # -------------------------------------------------------------------------

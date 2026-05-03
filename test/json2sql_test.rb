@@ -84,7 +84,7 @@ class SelectRunnerTest < Minitest::Test
       "users" => { "columns" => ["id", "name"] }
     )
     assert_match(/SELECT JSON_OBJECT\(/, sql)
-    assert_match(/JSON_ARRAYAGG\(JSON_OBJECT\(/, sql)
+    assert_match(/COALESCE\(JSON_ARRAYAGG\(JSON_OBJECT\(/, sql)
     assert_match(/'id', `users`\.`id`/, sql)
     assert_match(/'name', `users`\.`name`/, sql)
   end
@@ -301,6 +301,37 @@ class SelectRunnerTest < Minitest::Test
   def test_ends_with_semicolon_and_newline
     sql = Json2sql::SelectRunner.build("users" => { "columns" => ["id"] })
     assert sql.end_with?(";\n"), "Expected SQL to end with ;\\n, got: #{sql[-5..]}"
+  end
+
+  def test_nil_conditions_are_skipped
+    sql = Json2sql::SelectRunner.build(
+      "devices" => {
+        "columns" => ["id", "settings", "created_at"],
+        "options" => ["total"],
+        "and" => {
+          "type_id"     => { "=" => nil },
+          "firmware_id" => { "=" => nil },
+          "created_at"  => { ">=" => nil, "<=" => nil },
+          "id"          => { "=" => nil, "in" => { "user_devices" => { "columns" => ["device_id"], "and" => { "user_id" => { "=" => nil } } } } }
+        },
+        "order"    => { "id" => "desc" },
+        "offset"   => 0,
+        "limit"    => 50,
+        "parents"  => {
+          "firmwares" => { "columns" => ["build_board", "build_number", "build_version"] },
+          "types"     => { "columns" => ["name", "slug"] }
+        },
+        "children" => { "device_outputs" => { "columns" => ["name"] } }
+      }
+    )
+    # nil conditions must not produce spurious AND separators
+    refute_match(/AND\s+AND/, sql)
+    refute_match(/WHERE\s*\(\s*\)/, sql)
+    # the one active condition (id IN subquery) must be present
+    assert_match(/`devices`\.`id` IN/, sql)
+    assert_match(/SELECT `user_devices`\.`device_id` FROM `user_devices`/, sql)
+    # total subquery must also be present
+    assert_match(/COUNT\(\*\)/, sql)
   end
 end
 

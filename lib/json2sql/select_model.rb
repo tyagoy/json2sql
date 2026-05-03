@@ -61,20 +61,20 @@ module Json2sql
       build_offset(params)
     end
 
-    # SELECT JSON_ARRAYAGG(JSON_OBJECT(...)) AS `table`
+    # SELECT COALESCE(JSON_ARRAYAGG(JSON_OBJECT(...)), JSON_ARRAY()) AS `table`
     # FROM LATERAL (SELECT * FROM `table` WHERE ... ORDER ... LIMIT ...) AS `table`
 
     def build_query_array(params)
 
       @sep = false
 
-      @sql << "SELECT JSON_ARRAYAGG(JSON_OBJECT("
+      @sql << "SELECT COALESCE(JSON_ARRAYAGG(JSON_OBJECT("
 
       build_columns_json(params)
       build_columns_array(params)
       build_columns_object(params)
 
-      @sql << ")) AS "
+      @sql << ")), JSON_ARRAY()) AS "
 
       @sql << Sanitizer.keyword_wrap(@table)
 
