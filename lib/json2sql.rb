@@ -28,13 +28,13 @@ module Json2sql
   # Deep-converts all Hash keys to Strings and recurses into nested Hashes
   # and Arrays. Leaves all other values (Integers, Strings, etc.) unchanged.
 
-  def self.normalize(obj)
+  def self.normalize(object)
 
-    return obj.each_with_object({}) { |(k, v), h| h[k.to_s] = normalize(v) } if obj.is_a?(Hash)
+    return object.each_with_object({}) { |(key, value), hash| hash[key.to_s] = normalize(value) } if object.is_a?(Hash)
 
-    return obj.map { |v| normalize(v) } if obj.is_a?(Array)
+    return object.map { |value| normalize(value) } if object.is_a?(Array)
 
-    obj
+    object
   end
 
 end

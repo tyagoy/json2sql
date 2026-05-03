@@ -262,8 +262,6 @@ module Json2sql
 
       return unless children.is_a?(Hash)
 
-      relation = WhereRelation.parent(@table)
-
       children.each do |key, value|
 
         next unless value.is_a?(Hash)
@@ -273,6 +271,10 @@ module Json2sql
         @sep = true
 
         tbl = key.to_s
+
+        custom_key = value["key"].is_a?(String) && !value["key"].empty? ? value["key"] : nil
+
+        relation = WhereRelation.parent(@table, custom_key: custom_key)
 
         @sql << Sanitizer.keyword_wrap(tbl, "'")
 
@@ -293,8 +295,6 @@ module Json2sql
 
       return unless parents.is_a?(Hash)
 
-      relation = WhereRelation.child(@table)
-
       parents.each do |key, value|
 
         next unless value.is_a?(Hash)
@@ -304,6 +304,10 @@ module Json2sql
         @sep = true
 
         tbl = key.to_s
+
+        custom_key = value["key"].is_a?(String) && !value["key"].empty? ? value["key"] : nil
+
+        relation = WhereRelation.child(@table, custom_key: custom_key)
 
         @sql << Sanitizer.keyword_wrap(tbl, "'")
 

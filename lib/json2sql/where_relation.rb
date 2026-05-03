@@ -8,11 +8,13 @@ module Json2sql
 
     attr_reader :table, :kind
 
-    def initialize(table, kind)
+    def initialize(table, kind, custom_key: nil)
 
       @table = table.to_s
 
-      @kind  = kind
+      @kind = kind
+
+      @custom_key = custom_key.is_a?(String) && !custom_key.empty? ? custom_key : nil
     end
 
     # Factory: no relationship (top-level query).
@@ -25,17 +27,17 @@ module Json2sql
     # Factory: foreign key is on the child table pointing to the parent.
     # Produces: `parent`.`child_id` = `current`.`id`
 
-    def self.child(table)
+    def self.child(table, custom_key: nil)
 
-      new(table, CHILD)
+      new(table, CHILD, custom_key: custom_key)
     end
 
     # Factory: foreign key is on the current/parent table pointing to the child.
     # Produces: `current`.`parent_id` = `parent`.`id`
 
-    def self.parent(table)
+    def self.parent(table, custom_key: nil)
 
-      new(table, PARENT)
+      new(table, PARENT, custom_key: custom_key)
     end
 
     # Appends the JOIN condition for this relationship into sql.
@@ -51,7 +53,7 @@ module Json2sql
 
         sql << "."
 
-        sql << build_table_id(current)
+        sql << (@custom_key ? Sanitizer.keyword_wrap(@custom_key) : build_table_id(current))
 
         sql << " = "
 
@@ -68,7 +70,7 @@ module Json2sql
 
         sql << "."
 
-        sql << build_table_id(table)
+        sql << (@custom_key ? Sanitizer.keyword_wrap(@custom_key) : build_table_id(table))
 
         sql << " = "
 

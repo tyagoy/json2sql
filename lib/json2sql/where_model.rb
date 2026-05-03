@@ -41,9 +41,9 @@ module Json2sql
 
       return unless has_relation || has_where_and || has_where_or
 
-      parts = []
+      rules = []
 
-      parts << with_buffer { @relation.build_table_relation(@sql, @table) } if has_relation
+      rules << with_buffer { @relation.build_table_relation(@sql, @table) } if has_relation
 
       scope = has_where_and ? " AND " : " OR "
       
@@ -51,14 +51,14 @@ module Json2sql
 
       if group
 
-        frag = build_column_group(group, scope)
+        rule = build_column_group(group, scope)
 
-        parts << frag unless frag.empty?
+        rules << rule unless rule.empty?
       end
 
-      return if parts.empty?
+      return if rules.empty?
 
-      @sql << " WHERE " << parts.join(" AND ")
+      @sql << " WHERE " << rules.join(" AND ")
     end
 
     private
@@ -69,16 +69,16 @@ module Json2sql
 
     def build_column_group(params, scope)
 
-      fragments = params.filter_map do |key, value|
+      rules = params.filter_map do |key, value|
 
-        frag = with_buffer { build_column_types(value, scope, key.to_s) }
+        rule = with_buffer { build_column_types(value, scope, key.to_s) }
 
-        frag.empty? ? nil : frag
+        rule.empty? ? nil : rule
       end
 
-      return "" if fragments.empty?
+      return "" if rules.empty?
 
-      "(" + fragments.join(scope) + ")"
+      "(#{rules.join(scope)})"
     end
 
     # Dispatch by Ruby type of the value.
@@ -103,18 +103,18 @@ module Json2sql
 
         if column == "and"
 
-          frag = build_column_group(params, " AND ")
+          rule = build_column_group(params, " AND ")
 
-          @sql << frag unless frag.empty?
+          @sql << rule unless rule.empty?
 
           return
         end
 
         if column == "or"
 
-          frag = build_column_group(params, " OR ")
+          rule = build_column_group(params, " OR ")
 
-          @sql << frag unless frag.empty?
+          @sql << rule unless rule.empty?
 
           return
         end
@@ -129,14 +129,14 @@ module Json2sql
 
     def build_action_group(params, scope, column)
 
-      fragments = params.filter_map do |key, value|
+      rules = params.filter_map do |key, value|
 
-        frag = with_buffer { build_action_types(value, column, key.to_s) }
+        rule = with_buffer { build_action_types(value, column, key.to_s) }
 
-        frag.empty? ? nil : frag
+        rule.empty? ? nil : rule
       end
 
-      @sql << fragments.join(scope) unless fragments.empty?
+      @sql << rules.join(scope) unless rules.empty?
     end
 
     def build_action_types(params, column, action)

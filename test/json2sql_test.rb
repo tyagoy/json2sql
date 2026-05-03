@@ -298,6 +298,38 @@ class SelectRunnerTest < Minitest::Test
     assert_match(/`posts`.`user_id` = `users`.`id`/, sql)
   end
 
+  def test_nested_children_custom_key
+    sql = Json2sql::SelectRunner.build(
+      "firmwares" => {
+        "columns"  => ["id"],
+        "children" => {
+          "firmware_transitions" => {
+            "key"     => "old_firmware_id",
+            "columns" => ["id"]
+          }
+        }
+      }
+    )
+    assert_match(/'firmware_transitions'/, sql)
+    assert_match(/`firmware_transitions`\.`old_firmware_id` = `firmwares`\.`id`/, sql)
+  end
+
+  def test_nested_parents_custom_key
+    sql = Json2sql::SelectRunner.build(
+      "firmware_transitions" => {
+        "columns" => ["id"],
+        "parents" => {
+          "firmwares" => {
+            "key"     => "new_firmware_id",
+            "columns" => ["build_board"]
+          }
+        }
+      }
+    )
+    assert_match(/'firmwares'/, sql)
+    assert_match(/`firmware_transitions`\.`new_firmware_id` = `firmwares`\.`id`/, sql)
+  end
+
   def test_ends_with_semicolon_and_newline
     sql = Json2sql::SelectRunner.build("users" => { "columns" => ["id"] })
     assert sql.end_with?(";\n"), "Expected SQL to end with ;\\n, got: #{sql[-5..]}"
