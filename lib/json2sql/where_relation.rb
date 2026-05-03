@@ -86,19 +86,13 @@ module Json2sql
     
     def build_table_id(tbl)
 
-      tbl  = tbl.to_s
-      
-      base = Sanitizer.keyword(tbl)
+      base = Sanitizer.keyword(tbl.to_s)
 
-      name = if base.end_with?("ies")
-               base[0..-4] + "y"
-             elsif base.end_with?("s")
-               base[0..-2]
-             else
-               base
-             end
+      return "`#{base[0..-4]}y_id`" if base.end_with?("ies")
 
-      "`#{name}_id`"
+      return "`#{base[0..-2]}_id`" if base.end_with?("s")
+
+      "`#{base}_id`"
     end
 
   end

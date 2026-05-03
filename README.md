@@ -4,7 +4,7 @@ Pure-Ruby SQL builder. Translates Ruby Hashes (or parsed JSON) into MySQL/MariaD
 
 - No runtime dependencies
 - String and Symbol keys are both accepted
-- Target: MySQL 8.0+ / MariaDB 10.9+
+- Target: MySQL 8.0+
 
 ## Installation
 
@@ -269,7 +269,7 @@ Table and column names are sanitized by stripping characters outside `[a-zA-Z0-9
 - **No boolean equality** — use `1`/`0`. `true`/`false` only works with the `"null"` operator.
 - **`"options" => ["total"]` doubles query cost** — runs two subqueries. Ensure proper indexes.
 - **Empty `in` array emits `IN (NULL)`** — always false, intentional.
-- **`LATERAL` subqueries** — requires MySQL 8.0+ or MariaDB 10.9+.
+- **`LATERAL` subqueries** — requires MySQL 8.0+.
 
 ## Development
 

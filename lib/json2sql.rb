@@ -29,15 +29,12 @@ module Json2sql
   # and Arrays. Leaves all other values (Integers, Strings, etc.) unchanged.
 
   def self.normalize(obj)
-    
-    case obj
-    when Hash
-      obj.each_with_object({}) { |(k, v), h| h[k.to_s] = normalize(v) }
-    when Array
-      obj.map { |v| normalize(v) }
-    else
-      obj
-    end
+
+    return obj.each_with_object({}) { |(k, v), h| h[k.to_s] = normalize(v) } if obj.is_a?(Hash)
+
+    return obj.map { |v| normalize(v) } if obj.is_a?(Array)
+
+    obj
   end
 
 end
