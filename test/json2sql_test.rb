@@ -333,6 +333,32 @@ class SelectRunnerTest < Minitest::Test
     # total subquery must also be present
     assert_match(/COUNT\(\*\)/, sql)
   end
+
+  def test_function_column_in_json_select
+    sql = Json2sql::SelectRunner.build(
+      "firmwares" => {
+        "columns" => [
+          "id",
+          { "alias" => "build_bytes", "function" => "OCTET_LENGTH", "params" => ["data"] }
+        ]
+      }
+    )
+    assert_match(/'id', `firmwares`\.`id`/, sql)
+    assert_match(/'build_bytes', OCTET_LENGTH\(`firmwares`\.`data`\)/, sql)
+  end
+
+  def test_function_column_missing_alias_skipped
+    sql = Json2sql::SelectRunner.build(
+      "firmwares" => {
+        "columns" => [
+          "id",
+          { "function" => "OCTET_LENGTH", "params" => ["data"] }
+        ]
+      }
+    )
+    refute_match(/OCTET_LENGTH/, sql)
+    assert_match(/'id', `firmwares`\.`id`/, sql)
+  end
 end
 
 # ---------------------------------------------------------------------------

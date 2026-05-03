@@ -175,6 +175,25 @@ module Json2sql
 
       columns.each do |column|
 
+        if column.is_a?(Hash)
+
+          alias_name = column["alias"].to_s
+
+          next if alias_name.empty?
+
+          @sql << ", " if @sep
+
+          @sep = true
+
+          @sql << build_function(column)
+
+          @sql << " AS "
+
+          @sql << Sanitizer.keyword_wrap(alias_name)
+
+          next
+        end
+
         next unless column.is_a?(String) || column.is_a?(Symbol)
 
         @sql << ", " if @sep
@@ -196,6 +215,25 @@ module Json2sql
       return unless columns.is_a?(Array)
 
       columns.each do |column|
+
+        if column.is_a?(Hash)
+
+          alias_name = column["alias"].to_s
+
+          next if alias_name.empty?
+
+          @sql << ", " if @sep
+
+          @sep = true
+
+          @sql << Sanitizer.keyword_wrap(alias_name, "'")
+
+          @sql << ", "
+
+          @sql << build_function(column)
+
+          next
+        end
 
         next unless column.is_a?(String) || column.is_a?(Symbol)
 
@@ -275,6 +313,37 @@ module Json2sql
 
         @sql << ")"
       end
+    end
+
+    # Builds a SQL function call expression: FUNC_NAME(`table`.`col1`, ...)
+
+    def build_function(column)
+
+      function = Sanitizer.keyword(column["function"].to_s)
+
+      expression = +"#{function}("
+
+      glue = false
+
+      col_params = column["params"]
+
+      if col_params.is_a?(Array)
+
+        col_params.each do |param|
+
+          next unless param.is_a?(String) || param.is_a?(Symbol)
+
+          expression << ", " if glue
+
+          glue = true
+
+          expression << Sanitizer.keyword_wrap(@table) << "." << Sanitizer.keyword_wrap(param.to_s)
+        end
+      end
+
+      expression << ")"
+
+      expression
     end
 
     def build_order(params)
