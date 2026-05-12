@@ -10,6 +10,7 @@ require_relative "json2sql/update_model"
 require_relative "json2sql/update_runner"
 require_relative "json2sql/delete_model"
 require_relative "json2sql/delete_runner"
+require_relative "json2sql/input_policy"
 
 # Json2sql — SQL builder that generates MySQL/MariaDB query strings from
 # plain Ruby Hashes (or parsed JSON).
