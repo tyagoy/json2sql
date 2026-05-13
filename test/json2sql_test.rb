@@ -633,8 +633,11 @@ class InputPolicyTest < Minitest::Test
 
   def test_children_columns_filtered
     policy = Json2sql::InputPolicy.new(
-      mode:   :deny,
-      tables: { order_items: { columns: %w[cost_price] } }
+      tables: {
+        orders: {
+          children: { order_items: { columns: %w[id price] } }
+        }
+      }
     )
     result = policy.apply(
       "orders" => {
@@ -649,8 +652,11 @@ class InputPolicyTest < Minitest::Test
 
   def test_parents_columns_filtered
     policy = Json2sql::InputPolicy.new(
-      mode:   :deny,
-      tables: { users: { columns: %w[password_digest] } }
+      tables: {
+        orders: {
+          parents: { users: { columns: %w[id name] } }
+        }
+      }
     )
     result = policy.apply(
       "orders" => {
@@ -698,5 +704,138 @@ class InputPolicyTest < Minitest::Test
     refute_match(/`users`/, sql)
     refute_match(/`internal_notes`/, sql)
     assert_match(/`orders`\.`user_id` = 42/, sql)
+  end
+
+  def test_unspecified_relations_pass_through
+    policy = Json2sql::InputPolicy.new(
+      tables: { orders: { columns: %w[id] } }
+    )
+    result = policy.apply(
+      "orders" => {
+        "columns"  => ["id"],
+        "children" => { "order_items" => { "columns" => ["id"] } }
+      }
+    )
+    assert result["orders"]["children"].key?("order_items")
+  end
+
+  def test_allow_mode_blocks_unlisted_children
+    policy = Json2sql::InputPolicy.new(
+      tables: { orders: { children: { order_items: {} } } }
+    )
+    result = policy.apply(
+      "orders" => {
+        "columns"  => ["id"],
+        "children" => { "order_items" => { "columns" => ["id"] }, "logs" => { "columns" => ["id"] } }
+      }
+    )
+    assert result["orders"]["children"].key?("order_items")
+    refute result["orders"]["children"].key?("logs")
+  end
+
+  def test_allow_mode_blocks_unlisted_parents
+    policy = Json2sql::InputPolicy.new(
+      tables: { orders: { parents: { users: {} } } }
+    )
+    result = policy.apply(
+      "orders" => {
+        "columns" => ["id"],
+        "parents" => { "users" => { "columns" => ["id"] }, "companies" => { "columns" => ["id"] } }
+      }
+    )
+    assert result["orders"]["parents"].key?("users")
+    refute result["orders"]["parents"].key?("companies")
+  end
+
+  def test_deny_mode_strips_listed_children
+    policy = Json2sql::InputPolicy.new(
+      mode:   :deny,
+      tables: { orders: { children: { logs: { columns: %w[id] } } } }
+    )
+    result = policy.apply(
+      "orders" => {
+        "columns"  => ["id"],
+        "children" => { "order_items" => { "columns" => ["id"] }, "logs" => { "columns" => ["id"] } }
+      }
+    )
+    assert result["orders"]["children"].key?("order_items")
+    refute result["orders"]["children"].key?("logs")
+  end
+
+  def test_deny_mode_filters_columns_in_child_without_blocking_relation
+    policy = Json2sql::InputPolicy.new(
+      mode:   :deny,
+      tables: { devices: { children: { device_outputs: { columns: %w[updated_at] } } } }
+    )
+    result = policy.apply(
+      "devices" => {
+        "columns"  => ["id"],
+        "children" => { "device_outputs" => { "columns" => %w[name updated_at] } }
+      }
+    )
+    assert result["devices"]["children"].key?("device_outputs")
+    assert_equal %w[name], result["devices"]["children"]["device_outputs"]["columns"]
+  end
+
+  def test_recursive_child_columns_and_where_applied
+    policy = Json2sql::InputPolicy.new(
+      tables: {
+        orders: {
+          columns:  %w[id total],
+          children: {
+            order_items: {
+              columns: %w[id price],
+              where:   { "and" => { "active" => 1 } }
+            }
+          }
+        }
+      }
+    )
+    result = policy.apply(
+      "orders" => {
+        "columns"  => %w[id total secret],
+        "children" => {
+          "order_items" => { "columns" => %w[id price cost_price] }
+        }
+      }
+    )
+    assert_equal %w[id total],  result["orders"]["columns"]
+    assert_equal %w[id price],  result["orders"]["children"]["order_items"]["columns"]
+    assert_equal 1, result["orders"]["children"]["order_items"]["and"]["active"]
+  end
+
+  def test_recursive_parent_config_applied
+    policy = Json2sql::InputPolicy.new(
+      tables: {
+        orders: {
+          parents: {
+            users: {
+              columns: %w[id name],
+              parents: {
+                companies: { columns: %w[id name] }
+              }
+            }
+          }
+        }
+      }
+    )
+    result = policy.apply(
+      "orders" => {
+        "columns" => ["id"],
+        "parents" => {
+          "users" => {
+            "columns" => %w[id name secret],
+            "parents" => {
+              "companies"  => { "columns" => %w[id name slug] },
+              "audit_logs" => { "columns" => ["id"] }
+            }
+          }
+        }
+      }
+    )
+    assert_equal %w[id name], result["orders"]["parents"]["users"]["columns"]
+    assert  result["orders"]["parents"]["users"]["parents"].key?("companies")
+    refute  result["orders"]["parents"]["users"]["parents"].key?("audit_logs")
+    assert_equal %w[id name], result["orders"]["parents"]["users"]["parents"]["companies"]["columns"]
   end
 end
