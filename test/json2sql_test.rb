@@ -552,26 +552,26 @@ class DeleteRunnerTest < Minitest::Test
 end
 
 # ---------------------------------------------------------------------------
-# InputPolicy
+# QueryPolicy
 # ---------------------------------------------------------------------------
-class InputPolicyTest < Minitest::Test
+class QueryPolicyTest < Minitest::Test
 
   def test_allow_mode_blocks_unlisted_tables
-    policy = Json2sql::InputPolicy.new(tables: { orders: { columns: %w[id] } })
+    policy = Json2sql::QueryPolicy.new(tables: { orders: { columns: %w[id] } })
     result = policy.apply("orders" => { "columns" => ["id"] }, "users" => { "columns" => ["id"] })
     assert result.key?("orders")
     refute result.key?("users")
   end
 
   def test_empty_tables_allows_all_tables
-    policy = Json2sql::InputPolicy.new
+    policy = Json2sql::QueryPolicy.new
     result = policy.apply("orders" => { "columns" => ["id"] }, "users" => { "columns" => ["id"] })
     assert result.key?("orders")
     assert result.key?("users")
   end
 
   def test_deny_mode_strips_listed_columns
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       mode:   :deny,
       tables: { users: { columns: %w[password_digest api_token] } }
     )
@@ -580,7 +580,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_allow_mode_filters_to_listed_columns
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       tables: { users: { columns: %w[id name email] } }
     )
     result = policy.apply("users" => { "columns" => %w[id name email password_digest] })
@@ -588,7 +588,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_deny_mode_allows_all_tables
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       mode:   :deny,
       tables: { users: { columns: %w[password_digest] } }
     )
@@ -598,7 +598,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_forced_where_is_injected
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       tables: { orders: { where: { "and" => { "user_id" => 42 } } } }
     )
     result = policy.apply("orders" => { "columns" => ["id"] })
@@ -606,7 +606,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_forced_where_overwrites_user_supplied_value
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       tables: { orders: { where: { "and" => { "user_id" => 42 } } } }
     )
     result = policy.apply("orders" => { "columns" => ["id"], "and" => { "user_id" => 999 } })
@@ -614,7 +614,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_forced_where_preserves_other_user_conditions
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       tables: { orders: { where: { "and" => { "user_id" => 42 } } } }
     )
     result = policy.apply("orders" => { "columns" => ["id"], "and" => { "status" => 1 } })
@@ -623,7 +623,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_forced_where_creates_and_when_absent
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       tables: { orders: { where: { "and" => { "user_id" => 42 } } } }
     )
     result = policy.apply("orders" => { "columns" => ["id"] })
@@ -632,7 +632,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_children_columns_filtered
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       tables: {
         orders: {
           children: { order_items: { columns: %w[id price] } }
@@ -651,7 +651,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_parents_columns_filtered
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       tables: {
         orders: {
           parents: { users: { columns: %w[id name] } }
@@ -670,7 +670,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_symbol_keys_normalized
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       mode:   :deny,
       tables: { users: { columns: %w[password_digest] } }
     )
@@ -679,7 +679,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_function_column_hash_preserved_by_allow_mode
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       tables: { firmwares: { columns: %w[id] } }
     )
     func_col = { "alias" => "build_bytes", "function" => "OCTET_LENGTH", "params" => ["data"] }
@@ -688,7 +688,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_apply_result_works_with_select_runner
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       tables: {
         orders: {
           columns: %w[id total],
@@ -707,7 +707,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_unspecified_relations_pass_through
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       tables: { orders: { columns: %w[id] } }
     )
     result = policy.apply(
@@ -720,7 +720,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_allow_mode_blocks_unlisted_children
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       tables: { orders: { children: { order_items: {} } } }
     )
     result = policy.apply(
@@ -734,7 +734,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_allow_mode_blocks_unlisted_parents
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       tables: { orders: { parents: { users: {} } } }
     )
     result = policy.apply(
@@ -748,7 +748,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_deny_mode_strips_listed_children
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       mode:   :deny,
       tables: { orders: { children: { logs: { columns: %w[id] } } } }
     )
@@ -763,7 +763,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_deny_mode_filters_columns_in_child_without_blocking_relation
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       mode:   :deny,
       tables: { devices: { children: { device_outputs: { columns: %w[updated_at] } } } }
     )
@@ -778,7 +778,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_recursive_child_columns_and_where_applied
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       tables: {
         orders: {
           columns:  %w[id total],
@@ -805,7 +805,7 @@ class InputPolicyTest < Minitest::Test
   end
 
   def test_recursive_parent_config_applied
-    policy = Json2sql::InputPolicy.new(
+    policy = Json2sql::QueryPolicy.new(
       tables: {
         orders: {
           parents: {
@@ -837,5 +837,18 @@ class InputPolicyTest < Minitest::Test
     assert  result["orders"]["parents"]["users"]["parents"].key?("companies")
     refute  result["orders"]["parents"]["users"]["parents"].key?("audit_logs")
     assert_equal %w[id name], result["orders"]["parents"]["users"]["parents"]["companies"]["columns"]
+  end
+
+  def test_deny_mode_removes_table_when_all_columns_denied
+    policy = Json2sql::QueryPolicy.new(
+      mode:   :deny,
+      tables: { users: { columns: %w[id name email] } }
+    )
+    result = policy.apply(
+      "users"  => { "columns" => %w[id name email] },
+      "orders" => { "columns" => ["id"] }
+    )
+    refute result.key?("users")
+    assert result.key?("orders")
   end
 end

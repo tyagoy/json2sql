@@ -6,7 +6,9 @@ module Json2sql
   #   mode:   :allow (default) — only tables listed in `tables:` are accessible.
   #                              Tables absent from `tables:` are blocked entirely.
   #                              Empty `tables:` = no restriction.
-  #           :deny            — all tables pass; only listed columns are stripped.
+  #           :deny            — all tables pass. After column filtering, tables
+  #                              with no remaining accessible columns are removed.
+  #                              Same rule applies to children and parents.
   #   tables: Per-table configuration Hash (recursive):
   #     { table_name => { columns: [...],
   #                       children: { child_table => { columns: [...], ... } },
@@ -25,7 +27,7 @@ module Json2sql
   #               user-supplied values — primary IDOR guard.
   #
   # Usage:
-  #   policy = Json2sql::InputPolicy.new(
+  #   policy = Json2sql::QueryPolicy.new(
   #     mode:   :allow,
   #     tables: {
   #       orders: {
@@ -39,7 +41,7 @@ module Json2sql
   #   safe_input = policy.apply(raw_params)
   #   sql = Json2sql::SelectRunner.build(safe_input)
 
-  class InputPolicy
+  class QueryPolicy
 
     def initialize(mode: :allow, tables: {})
 
@@ -54,26 +56,23 @@ module Json2sql
     def apply(input)
 
       input = Json2sql.normalize(input)
+      
+      filter_tables(input, @tables)
 
-      input = filter_tables(input)
+      input.each { |table, params| sanitize_table(params, @tables[table]) }
 
-      input.each { |table, params| sanitize_table(params, @tables[table] || {}) }
+      input.reject! { |_, params| empty_columns?(params) }
 
       input
     end
 
     private
 
-    def filter_tables(input)
-
-      return input if @mode == :deny || @tables.empty?
-
-      input.select { |table, _| @tables.key?(table) }
-    end
-
     def sanitize_table(params, config)
 
       return unless params.is_a?(Hash)
+
+      return unless config.is_a?(Hash)
 
       filter_columns(params, config)
 
@@ -81,46 +80,55 @@ module Json2sql
 
       %w[children parents].each do |relation|
 
-        if @mode == :deny
+        filter_relations(params, config, relation)
 
-          next unless params[relation].is_a?(Hash)
+        next unless params[relation].is_a?(Hash)
 
-          relation_configs = config[relation].is_a?(Hash) ? config[relation] : {}
+        tables = config[relation].is_a?(Hash) ? config[relation] : {}
 
-          params[relation].each { |child_table, child_params| sanitize_table(child_params, relation_configs[child_table] || {}) }
+        params[relation].each { |table, params| sanitize_table(params, tables[table]) }
 
-          params[relation].reject! { |_, child_params| child_params.is_a?(Hash) && child_params["columns"].is_a?(Array) && child_params["columns"].empty? }
+        params[relation].reject! { |_, params| empty_columns?(params) }
 
-        else
-
-          filter_relations(params, config, relation)
-
-          next unless params[relation].is_a?(Hash)
-
-          relation_configs = config[relation].is_a?(Hash) ? config[relation] : {}
-
-          params[relation].each { |child_table, child_params| sanitize_table(child_params, relation_configs[child_table] || {}) }
-
-        end
       end
     end
 
+    def empty_columns?(params)
+
+      params.is_a?(Hash) && params["columns"].is_a?(Array) && params["columns"].empty?
+    end
+
+    def filter_tables(params, config)
+
+      return if @mode == :deny
+
+      return unless params.is_a?(Hash)
+
+      tables = config.is_a?(Hash) ? config : {}
+
+      return if tables.empty?
+
+      params.select! { |table, _| tables.key?(table) }
+    end
+    
     # Filters children/parents relations in :allow mode.
-    # Only relations present as keys in config[relation_key] pass through.
-    # If config[relation_key] is absent or not a Hash, relations are untouched.
-    # In :deny mode, pruning is handled in sanitize_table after column filtering.
+    # Only relations present as keys in config[relation] pass through.
+    # If config[relation] is absent or not a Hash, relations are untouched.
+    # No-op in :deny mode.
 
-    def filter_relations(params, config, relation_key)
+    def filter_relations(params, config, relation)
 
-      relations = params[relation_key]
+      return if @mode == :deny
 
-      return unless relations.is_a?(Hash)
+      param_tables = params[relation]
 
-      relation_config = config[relation_key]
+      return unless param_tables.is_a?(Hash)
 
-      return unless relation_config.is_a?(Hash)
+      config_tables = config[relation]
 
-      params[relation_key] = relations.select { |t, _| relation_config.key?(t) }
+      return unless config_tables.is_a?(Hash)
+
+      params[relation] = param_tables.select { |table, _| config_tables.key?(table) }
     end
 
     # Filters "columns" using mode (:allow or :deny).
