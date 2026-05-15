@@ -141,6 +141,29 @@ Json2sql::SelectRunner.build(
 )
 ```
 
+### Function columns and bigint-safe JSON
+
+Function columns in SELECT use objects in the `columns` array with `alias`, `function` and `params`.
+
+You can use generic SQL `CAST` in function columns via:
+
+- `{"alias" => "field", "function" => "CAST", "params" => ["source_column", "TYPE"]}`
+
+To return 64-bit integer columns as JSON strings (avoiding precision loss in JS clients), use `TYPE = "CHAR"`:
+
+```ruby
+Json2sql::SelectRunner.build(
+  "devices" => {
+    "columns" => [
+      { "alias" => "id", "function" => "CAST", "params" => ["id", "CHAR"] },
+      "name"
+    ]
+  }
+)
+```
+
+This generates a JSON value like `CAST(`devices`.`id` AS CHAR)` for the aliased key.
+
 ### Nested children (one-to-many)
 
 ```ruby

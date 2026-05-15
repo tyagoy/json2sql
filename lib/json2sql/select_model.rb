@@ -325,15 +325,24 @@ module Json2sql
 
       function = Sanitizer.keyword(column["function"].to_s)
 
-      expression = +"#{function}("
+      params = column["params"]
+
+      return build_function_cast(params) if function.upcase == "CAST"
+
+      build_function_default(function, params)
+    end
+
+    def build_function_default(function, params)
+
+      expression = +""
+
+      expression << function << "("
 
       glue = false
 
-      col_params = column["params"]
+      if params.is_a?(Array)
 
-      if col_params.is_a?(Array)
-
-        col_params.each do |param|
+        params.each do |param|
 
           next unless param.is_a?(String) || param.is_a?(Symbol)
 
@@ -346,6 +355,32 @@ module Json2sql
       end
 
       expression << ")"
+
+      expression
+    end
+
+    # Supports function payload: {"function"=>"CAST", "params"=>["id", "CHAR"]}
+    # and generic cast targets like SIGNED/UNSIGNED/CHAR.
+
+    def build_function_cast(params)
+
+      return +"NULL" unless params.is_a?(Array) && params.length >= 2
+
+      source = params[0]
+
+      return +"NULL" unless source.is_a?(String) || source.is_a?(Symbol)
+
+      cast_type = Sanitizer.keyword(params[1].to_s).upcase
+
+      return +"NULL" if cast_type.empty?
+
+      expression = +"CAST("
+
+      expression << Sanitizer.keyword_wrap(@table) << "."
+
+      expression << Sanitizer.keyword_wrap(source.to_s)
+
+      expression << " AS " << cast_type << ")"
 
       expression
     end

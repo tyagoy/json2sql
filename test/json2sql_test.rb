@@ -391,6 +391,39 @@ class SelectRunnerTest < Minitest::Test
     refute_match(/OCTET_LENGTH/, sql)
     assert_match(/'id', `firmwares`\.`id`/, sql)
   end
+
+  def test_function_cast_char_column_in_json_select
+    sql = Json2sql::SelectRunner.build(
+      "devices" => {
+        "columns" => [
+          { "alias" => "id", "function" => "CAST", "params" => ["id", "CHAR"] }
+        ]
+      }
+    )
+    assert_match(/'id', CAST\(`devices`\.`id` AS CHAR\)/, sql)
+  end
+
+  def test_function_cast_signed_column_in_json_select
+    sql = Json2sql::SelectRunner.build(
+      "devices" => {
+        "columns" => [
+          { "alias" => "id", "function" => "CAST", "params" => ["id", "SIGNED"] }
+        ]
+      }
+    )
+    assert_match(/'id', CAST\(`devices`\.`id` AS SIGNED\)/, sql)
+  end
+
+  def test_function_cast_invalid_params_returns_null
+    sql = Json2sql::SelectRunner.build(
+      "devices" => {
+        "columns" => [
+          { "alias" => "id", "function" => "CAST", "params" => ["id"] }
+        ]
+      }
+    )
+    assert_match(/'id', NULL/, sql)
+  end
 end
 
 # ---------------------------------------------------------------------------
