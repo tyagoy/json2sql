@@ -596,11 +596,23 @@ class QueryPolicyTest < Minitest::Test
     refute result.key?("users")
   end
 
-  def test_empty_tables_allows_all_tables
+  def test_empty_tables_blocks_all_tables
     policy = Json2sql::QueryPolicy.new
     result = policy.apply("orders" => { "columns" => ["id"] }, "users" => { "columns" => ["id"] })
-    assert result.key?("orders")
-    assert result.key?("users")
+    refute result.key?("orders")
+    refute result.key?("users")
+  end
+
+  def test_allow_mode_removes_table_when_columns_empty_after_filter
+    policy = Json2sql::QueryPolicy.new(tables: { orders: { columns: %w[id total] } })
+    result = policy.apply("orders" => { "columns" => ["secret"] })
+    refute result.key?("orders")
+  end
+
+  def test_allow_mode_removes_table_when_hash_columns_empty_after_filter
+    policy = Json2sql::QueryPolicy.new(tables: { orders: { columns: %w[id total] } })
+    result = policy.apply("orders" => { "columns" => { "secret" => "val" } })
+    refute result.key?("orders")
   end
 
   def test_deny_mode_strips_listed_columns
@@ -632,7 +644,7 @@ class QueryPolicyTest < Minitest::Test
 
   def test_forced_where_is_injected
     policy = Json2sql::QueryPolicy.new(
-      tables: { orders: { where: { "and" => { "user_id" => 42 } } } }
+      tables: { orders: { columns: %w[id], where: { "and" => { "user_id" => 42 } } } }
     )
     result = policy.apply("orders" => { "columns" => ["id"] })
     assert_equal({ "user_id" => 42 }, result["orders"]["and"])
@@ -640,7 +652,7 @@ class QueryPolicyTest < Minitest::Test
 
   def test_forced_where_overwrites_user_supplied_value
     policy = Json2sql::QueryPolicy.new(
-      tables: { orders: { where: { "and" => { "user_id" => 42 } } } }
+      tables: { orders: { columns: %w[id], where: { "and" => { "user_id" => 42 } } } }
     )
     result = policy.apply("orders" => { "columns" => ["id"], "and" => { "user_id" => 999 } })
     assert_equal 42, result["orders"]["and"]["user_id"]
@@ -648,7 +660,7 @@ class QueryPolicyTest < Minitest::Test
 
   def test_forced_where_preserves_other_user_conditions
     policy = Json2sql::QueryPolicy.new(
-      tables: { orders: { where: { "and" => { "user_id" => 42 } } } }
+      tables: { orders: { columns: %w[id], where: { "and" => { "user_id" => 42 } } } }
     )
     result = policy.apply("orders" => { "columns" => ["id"], "and" => { "status" => 1 } })
     assert_equal 42, result["orders"]["and"]["user_id"]
@@ -657,7 +669,7 @@ class QueryPolicyTest < Minitest::Test
 
   def test_forced_where_creates_and_when_absent
     policy = Json2sql::QueryPolicy.new(
-      tables: { orders: { where: { "and" => { "user_id" => 42 } } } }
+      tables: { orders: { columns: %w[id], where: { "and" => { "user_id" => 42 } } } }
     )
     result = policy.apply("orders" => { "columns" => ["id"] })
     assert result["orders"]["and"].is_a?(Hash)
@@ -668,6 +680,7 @@ class QueryPolicyTest < Minitest::Test
     policy = Json2sql::QueryPolicy.new(
       tables: {
         orders: {
+          columns:  %w[id],
           children: { order_items: { columns: %w[id price] } }
         }
       }
@@ -687,6 +700,7 @@ class QueryPolicyTest < Minitest::Test
     policy = Json2sql::QueryPolicy.new(
       tables: {
         orders: {
+          columns: %w[id],
           parents: { users: { columns: %w[id name] } }
         }
       }
@@ -739,7 +753,7 @@ class QueryPolicyTest < Minitest::Test
     assert_match(/`orders`\.`user_id` = 42/, sql)
   end
 
-  def test_unspecified_relations_pass_through
+  def test_unspecified_relations_blocked_in_allow_mode
     policy = Json2sql::QueryPolicy.new(
       tables: { orders: { columns: %w[id] } }
     )
@@ -749,12 +763,12 @@ class QueryPolicyTest < Minitest::Test
         "children" => { "order_items" => { "columns" => ["id"] } }
       }
     )
-    assert result["orders"]["children"].key?("order_items")
+    assert result["orders"]["children"].empty?
   end
 
   def test_allow_mode_blocks_unlisted_children
     policy = Json2sql::QueryPolicy.new(
-      tables: { orders: { children: { order_items: {} } } }
+      tables: { orders: { columns: %w[id], children: { order_items: { columns: %w[id] } } } }
     )
     result = policy.apply(
       "orders" => {
@@ -768,7 +782,7 @@ class QueryPolicyTest < Minitest::Test
 
   def test_allow_mode_blocks_unlisted_parents
     policy = Json2sql::QueryPolicy.new(
-      tables: { orders: { parents: { users: {} } } }
+      tables: { orders: { columns: %w[id], parents: { users: { columns: %w[id] } } } }
     )
     result = policy.apply(
       "orders" => {
@@ -841,6 +855,7 @@ class QueryPolicyTest < Minitest::Test
     policy = Json2sql::QueryPolicy.new(
       tables: {
         orders: {
+          columns: %w[id],
           parents: {
             users: {
               columns: %w[id name],

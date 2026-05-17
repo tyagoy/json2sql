@@ -5,7 +5,7 @@ module Json2sql
   # Parameters:
   #   mode:   :allow (default) — only tables listed in `tables:` are accessible.
   #                              Tables absent from `tables:` are blocked entirely.
-  #                              Empty `tables:` = no restriction.
+  #                              Empty `tables:` = all tables blocked.
   #           :deny            — all tables pass. After column filtering, tables
   #                              with no remaining accessible columns are removed.
   #                              Same rule applies to children and parents.
@@ -95,7 +95,11 @@ module Json2sql
 
     def empty_columns?(params)
 
-      params.is_a?(Hash) && params["columns"].is_a?(Array) && params["columns"].empty?
+      return false unless params.is_a?(Hash)
+
+      columns = params["columns"]
+
+      (columns.is_a?(Array) || columns.is_a?(Hash)) && columns.empty?
     end
 
     def filter_tables(params, config)
@@ -106,14 +110,12 @@ module Json2sql
 
       tables = config.is_a?(Hash) ? config : {}
 
-      return if tables.empty?
-
       params.select! { |table, _| tables.key?(table) }
     end
     
     # Filters children/parents relations in :allow mode.
     # Only relations present as keys in config[relation] pass through.
-    # If config[relation] is absent or not a Hash, relations are untouched.
+    # If config[relation] is absent or not a Hash, all relations are blocked.
     # No-op in :deny mode.
 
     def filter_relations(params, config, relation)
@@ -126,35 +128,55 @@ module Json2sql
 
       config_tables = config[relation]
 
-      return unless config_tables.is_a?(Hash)
-
-      params[relation] = param_tables.select { |table, _| config_tables.key?(table) }
+      params[relation] = config_tables.is_a?(Hash) ? param_tables.select { |table, _| config_tables.key?(table) } : {}
     end
 
     # Filters "columns" using mode (:allow or :deny).
     # Handles Array (SELECT) and Hash (INSERT/UPDATE) column formats.
     # Hash entries (function columns) always pass through in :allow mode.
-    # If no column list is defined for the table, columns are untouched.
+    # If no column list is defined: in :allow mode all columns are blocked;
+    # in :deny mode columns are untouched.
 
     def filter_columns(params, config)
 
-      columns = params["columns"]
+      param_columns = params["columns"]
 
-      return unless columns.is_a?(Array) || columns.is_a?(Hash)
+      return unless param_columns.is_a?(Array) || param_columns.is_a?(Hash)
 
-      list = config["columns"]
+      config_columns = config["columns"]
 
-      return unless list.is_a?(Array)
+      unless config_columns.is_a?(Array)
 
-      params["columns"] = if @mode == :deny
+        if @mode == :allow
 
-        columns.is_a?(Array) ? columns.reject { |c| list.include?(c) } : columns.reject { |k, _| list.include?(k) }
+          params["columns"] = param_columns.is_a?(Array) ? [] : {}
+        end
 
-      else
-
-        columns.is_a?(Array) ? columns.select { |c| c.is_a?(Hash) || list.include?(c) } : columns.select { |k, _| list.include?(k) }
-
+        return
       end
+
+      if @mode == :deny
+
+        if param_columns.is_a?(Array)
+
+          params["columns"] = param_columns.reject { |c| config_columns.include?(c) }
+
+          return
+        end
+
+        params["columns"] = param_columns.reject { |k, _| config_columns.include?(k) }
+
+        return
+      end
+
+      if param_columns.is_a?(Array)
+
+        params["columns"] = param_columns.select { |c| c.is_a?(Hash) || config_columns.include?(c) }
+        
+        return
+      end
+
+      params["columns"] = param_columns.select { |k, _| config_columns.include?(k) }
     end
 
     # Merges forced "and" conditions into params["and"].
