@@ -287,6 +287,97 @@ Single quotes in strings are doubled (`O'Brien` → `'O''Brien'`). Backslashes a
 
 Table and column names are sanitized by stripping characters outside `[a-zA-Z0-9_-]`. Malformed identifiers become mangled but harmless (e.g. `"users; DROP TABLE"` → `` `usersDROPTABLE` ``). Values are always wrapped in quoted literals.
 
+---
+
+## QueryPolicy
+
+`Json2sql::QueryPolicy` sanitizes a raw input Hash before passing it to any Runner. Use it as a server-side access control layer — it enforces which tables, columns, children and parents a caller may query, and injects forced WHERE conditions to prevent IDOR.
+
+```ruby
+policy = Json2sql::QueryPolicy.new(
+  mode:   :allow,
+  tables: {
+    orders: {
+      columns:  %w[id total status],
+      children: { order_items: { columns: %w[id price] } },
+      parents:  { users:       { columns: %w[id name] } },
+      where:    { "and" => { "user_id" => 42 } }
+    }
+  }
+)
+
+safe_input = policy.apply(raw_params)
+sql        = Json2sql::SelectRunner.build(safe_input)
+```
+
+### mode
+
+| Value | Behaviour |
+|---|---|
+| `:allow` (default) | Only tables listed in `tables:` are accessible. Tables absent from the config are blocked entirely. Empty `tables:` blocks everything. |
+| `:deny` | All tables pass. After column filtering, tables with no remaining columns are removed. Same rule applies to children and parents. |
+
+### Per-table configuration
+
+```ruby
+{
+  table_name => {
+    columns:  [...],          # column list
+    children: { child  => { columns: [...], ... } },
+    parents:  { parent => { columns: [...], ... } },
+    where:    { "and"  => { col => val } }
+  }
+}
+```
+
+| Key | `:allow` mode | `:deny` mode |
+|---|---|---|
+| `columns` absent or nil | all columns blocked | columns untouched |
+| `columns: [...]` | only listed columns pass; function-column Hashes always pass | listed columns are removed |
+| `children` / `parents` absent | all relations blocked | relations untouched |
+| `children: { t => {...} }` | only listed child tables pass | listed child tables are removed |
+| `where: { "and" => {...} }` | forced conditions merged into `"and"`; forced keys overwrite user-supplied values | same |
+
+### IDOR guard
+
+Forced `where` keys always overwrite the user-supplied value for the same column:
+
+```ruby
+# config: where: { "and" => { "user_id" => 42 } }
+# user sends: "and" => { "user_id" => 999 }
+# result:     "and" => { "user_id" => 42 }   ← attacker cannot override
+```
+
+### Recursive nesting
+
+`children` and `parents` configs are recursive — each nested table accepts its own `columns`, `children`, `parents` and `where`.
+
+```ruby
+Json2sql::QueryPolicy.new(
+  tables: {
+    orders: {
+      columns: %w[id total],
+      children: {
+        order_items: {
+          columns: %w[id price],
+          parents: { products: { columns: %w[id name] } }
+        }
+      }
+    }
+  }
+)
+```
+
+### String and Symbol keys
+
+Both are accepted — normalized internally.
+
+```ruby
+Json2sql::QueryPolicy.new(tables: { orders: { columns: %w[id] } })
+# same as
+Json2sql::QueryPolicy.new(tables: { "orders" => { "columns" => %w[id] } })
+```
+
 ## Pitfalls
 
 - **No boolean equality** — use `1`/`0`. `true`/`false` only works with the `"null"` operator.
