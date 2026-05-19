@@ -797,7 +797,7 @@ class QueryPolicyTest < Minitest::Test
   def test_deny_mode_strips_listed_children
     policy = Json2sql::QueryPolicy.new(
       mode:   :deny,
-      tables: { orders: { children: { logs: { columns: %w[id] } } } }
+      tables: { orders: { columns: [], children: { logs: { columns: %w[id] } } } }
     )
     result = policy.apply(
       "orders" => {
@@ -812,7 +812,7 @@ class QueryPolicyTest < Minitest::Test
   def test_deny_mode_filters_columns_in_child_without_blocking_relation
     policy = Json2sql::QueryPolicy.new(
       mode:   :deny,
-      tables: { devices: { children: { device_outputs: { columns: %w[updated_at] } } } }
+      tables: { devices: { columns: [], children: { device_outputs: { columns: %w[updated_at] } } } }
     )
     result = policy.apply(
       "devices" => {
@@ -898,5 +898,27 @@ class QueryPolicyTest < Minitest::Test
     )
     refute result.key?("users")
     assert result.key?("orders")
+  end
+
+  def test_allow_mode_blocks_all_columns_when_config_has_no_columns_key
+    policy = Json2sql::QueryPolicy.new(
+      mode:   :allow,
+      tables: { user_devices: {} }
+    )
+    result = policy.apply(
+      "user_devices" => { "columns" => { "index" => 0 }, "and" => { "id" => 1 } }
+    )
+    assert result.empty?
+  end
+
+  def test_deny_mode_passes_all_columns_when_config_has_no_columns_key
+    policy = Json2sql::QueryPolicy.new(
+      mode:   :deny,
+      tables: { user_devices: {} }
+    )
+    result = policy.apply(
+      "user_devices" => { "columns" => { "index" => 0, "name" => "x" } }
+    )
+    assert_equal({ "index" => 0, "name" => "x" }, result["user_devices"]["columns"])
   end
 end

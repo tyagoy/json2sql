@@ -14,8 +14,7 @@ module Json2sql
   #                       children: { child_table => { columns: [...], ... } },
   #                       parents:  { parent_table => { columns: [...], ... } },
   #                       where: { "and" => { col => val } } } }
-  #     columns:  column list — filtered by `mode` (allowed or denied).
-  #               nil or absent = no column restriction for that table.
+    #     columns:  Array — filtered by `mode` (allowed or denied).
   #     children: nested hash of allowed/denied child tables with their own config.
   #               nil or absent = no restriction on children.
   #               In :deny mode: a child relation is removed only when all its
@@ -134,26 +133,12 @@ module Json2sql
     # Filters "columns" using mode (:allow or :deny).
     # Handles Array (SELECT) and Hash (INSERT/UPDATE) column formats.
     # Hash entries (function columns) always pass through in :allow mode.
-    # If no column list is defined: in :allow mode all columns are blocked;
-    # in :deny mode columns are untouched.
 
     def filter_columns(params, config)
 
-      param_columns = params["columns"]
+      param_columns = params["columns"] || []      
 
-      return unless param_columns.is_a?(Array) || param_columns.is_a?(Hash)
-
-      config_columns = config["columns"]
-
-      unless config_columns.is_a?(Array)
-
-        if @mode == :allow
-
-          params["columns"] = param_columns.is_a?(Array) ? [] : {}
-        end
-
-        return
-      end
+      config_columns = config["columns"] || []
 
       if @mode == :deny
 
