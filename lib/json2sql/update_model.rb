@@ -69,10 +69,11 @@ module Json2sql
         @sql << " = "
 
         case value
-        when Float   then @sql << value.to_s
-        when Integer then @sql << value.to_s
-        when String  then @sql << Sanitizer.value_wrap(value)
-        when :now    then @sql << "NOW()"
+        when NilClass then @sql << "NULL"
+        when Float    then @sql << value.to_s
+        when Integer  then @sql << value.to_s
+        when String   then @sql << Sanitizer.value_wrap(value)
+        when :now     then @sql << "NOW()"
         end
       end
     end
